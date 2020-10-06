@@ -1,0 +1,6 @@
+allprojects {
+    group = 'com.canaldigital.tsi'
+    version = '1.0'
+}
+
+

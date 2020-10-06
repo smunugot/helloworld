@@ -1,0 +1,94 @@
+buildscript {
+	repositories {
+	  maven {
+		url "https://plugins.gradle.org/m2/"
+	  }
+	  mavenCentral()
+	}
+	dependencies {
+		classpath('org.springframework.boot:spring-boot-gradle-plugin:2.3.0.RELEASE')
+	}
+}
+
+plugins {
+	id "com.gorylenko.gradle-git-properties" version "1.4.17"
+	id "org.sonarqube" version "2.6"
+	id "com.palantir.docker" version "0.25.0"
+}
+
+ext {
+	shortName = 'helloworld-docker'
+	ecrRepositoryUri = '068196104309.dkr.ecr.eu-central-1.amazonaws.com/pgw-installer'
+}
+configurations {
+	newrelic
+}
+
+archivesBaseName = "helloworld-docker"
+
+
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+
+apply from: 'version.gradle'
+
+tasks.withType(JavaCompile) { options.encoding = 'UTF-8' }
+
+apply plugin: 'java-library'
+apply plugin:'eclipse'
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+sonarqube {
+	properties {
+		property "sonar.sources", "src/main/java"
+		property "sonar.tests", "src/test/java"
+		property "sonar.java.coveragePlugin", "jacoco"
+	}
+}
+
+bootJar {
+	baseName = project.shortName
+	version =  project.version
+}
+
+
+dependencies {
+	compile("org.springframework.boot:spring-boot-starter-web")
+	compile("org.springframework.boot:spring-boot-starter-actuator")
+	//newrelic "com.newrelic.agent.java:newrelic-agent:5.6.0"
+}
+
+/*
+task copyNewrelic(type: Copy) {
+	dependsOn build
+	from configurations.newrelic
+	into "$buildDir/newrelic"
+}
+*/
+docker {
+//	dependsOn copyNewrelic
+	name "${project.shortName}"
+	dockerfile file('Dockerfile')
+	
+/*	copySpec.with {
+		from('build/newrelic') {
+			include '*.jar'
+			into './lib/'
+		}
+		from('src/main/resources') {
+			include '/newrelic.yml'
+			into './config/'
+		}
+	}*/
+	
+	files bootJar.archivePath
+	buildArgs(['JAR_FILE': "${bootJar.archiveName}"])
+	
+	tag "-${version}", "${ecrRepositoryUri}:${version}"
+	tag "-latest", "${ecrRepositoryUri}:latest"
+}
+
+repositories {
+	mavenCentral()
+}
